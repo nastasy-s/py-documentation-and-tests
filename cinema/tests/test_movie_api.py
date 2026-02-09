@@ -276,3 +276,16 @@ class MovieCreatePermissionTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Movie.objects.filter(title="New").exists())
+
+class MovieUnauthenticatedReadOnlyTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.movie = sample_movie()
+
+    def test_movie_list_allowed(self):
+        res = self.client.get(MOVIE_URL)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_movie_detail_allowed(self):
+        res = self.client.get(detail_url(self.movie.id))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
