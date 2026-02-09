@@ -11,7 +11,6 @@ from rest_framework.test import APIClient
 
 from cinema.models import Actor, CinemaHall, Genre, Movie, MovieSession
 
-
 MOVIE_URL = reverse("cinema:movie-list")
 MOVIE_SESSION_URL = reverse("cinema:moviesession-list")
 
@@ -47,7 +46,7 @@ def sample_actor(**params):
 
 
 def sample_movie_session(movie, **params):
-    cinema_hall = CinemaHall.objects.create(name="Blue", rows=20, seats_in_row=20)
+    cinema_hall = CinemaHall.objects.create(name="Blue", rows=20, seats_in_row=20)  # noqa 501
     defaults = {
         "show_time": datetime(2022, 6, 2, 14, 0, 0),
         "movie": movie,
@@ -277,6 +276,7 @@ class MovieCreatePermissionTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Movie.objects.filter(title="New").exists())
 
+
 class MovieUnauthenticatedReadOnlyTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -289,3 +289,38 @@ class MovieUnauthenticatedReadOnlyTests(TestCase):
     def test_movie_detail_allowed(self):
         res = self.client.get(detail_url(self.movie.id))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+
+class MovieUploadImagePermissionTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.movie = sample_movie()
+        self.user = get_user_model().objects.create_user(
+            email="user@test.com",
+            password="pass12345",
+        )
+
+    def test_upload_image_unauthorized_returns_401(self):
+        url = image_upload_url(self.movie.id)
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
+            img = Image.new("RGB", (10, 10))
+            img.save(ntf, format="JPEG")
+            ntf.seek(0)
+
+            res = self.client.post(url, {"image": ntf}, format="multipart")
+
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_upload_image_non_admin_returns_403(self):
+        self.client.force_authenticate(self.user)
+        url = image_upload_url(self.movie.id)
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
+            img = Image.new("RGB", (10, 10))
+            img.save(ntf, format="JPEG")
+            ntf.seek(0)
+
+            res = self.client.post(url, {"image": ntf}, format="multipart")
+
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
